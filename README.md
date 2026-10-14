@@ -3,8 +3,11 @@
 Upload a resume PDF, paste a job description, get a match score out of 100, the
 skills present on the resume, and the skills missing from it.
 
-The AI comparison is a later step. Today the score comes from deterministic
-keyword matching, so the whole thing runs with no API key and no AI cost.
+Scoring runs twice, and the built-in pass is the floor. A deterministic keyword
+pass always scores the resume; with `LABD_API_KEY` set, labd reviews the same
+resume against the same job description and its score, skills and written verdict
+replace the keyword ones. With no key the app behaves exactly as before, which is
+why nothing here needs an API key to run or to test.
 
 **One deployable.** Express serves the API *and* the built React UI from the same
 process, on the same origin. There is no second Vercel project, no CORS, and no
@@ -23,7 +26,7 @@ backend/          the API and the web server - Express, MongoDB
   server.js       Server: builds the app, serves the API and the built UI
   routes/         path -> controller
   controllers/    request in, response out
-  services/       the actual work (PDF text, scoring, AI seam)
+  services/       the actual work (PDF text, scoring, labd AI)
   config/         env vars, the skill vocabulary loader
   middleware/     CORS, uploads, error handling
   utils.js        small shared helpers
@@ -119,10 +122,11 @@ Everything is mounted under `/api`, and it has to stay that way: the rewrite in
 the root `vercel.json` only sends `/api/*` to the app, and the frontend calls
 `/api/...` relative paths.
 
-`POST /api/parse` returns 201 with the score, `present`, `missing`, `checks` and
-`aiSummary` (null until the AI step is wired up). It returns 415 for a non-PDF,
-413 for a file over 5 MB, and 422 for a PDF with no extractable text - a scan or
-an image, which is a user problem rather than a server error.
+`POST /api/parse` returns 201 with the score, `present`, `missing`, `checks`,
+`engine` (`heuristic` or `ai`) and `aiSummary` (null unless the labd key is set).
+It returns 415 for a non-PDF, 413 for a file over 5 MB, and 422 for a PDF with no
+extractable text - a scan or an image, which is a user problem rather than a
+server error.
 
 Storage is deliberate: the score and the matched skills are saved, the resume
 text and the raw PDF are not. A resume is full of personal data, and keeping text
@@ -136,6 +140,8 @@ npm test
 
 - `backend/test/scoring.test.js` - the scoring rules, pure functions
 - `backend/test/api.test.js` - HTTP behaviour and the pdf-parse import shape
+- `backend/test/ai.test.js` - the labd reply parsing, validation and the merge
+  with the built-in score; no network calls
 - `backend/test/static.test.js` - one server serves the UI and the API; skips
   itself when `frontend/dist` does not exist yet
 
@@ -156,7 +162,11 @@ Environment variables (Vercel dashboard, not a committed file):
 - `CLIENT_ORIGINS` - **optional now**. Only needed if something on a different
   origin calls the API. Comma-separated, no trailing slash, because a trailing
   slash never matches the `Origin` header the browser sends.
-- `AI_API_KEY` - optional, leave unset for now
+- `LABD_API_KEY` - optional. Absent, every resume is scored by the built-in
+  keyword pass. Set, labd adds the score, the written verdict and a corrected
+  skill breakdown, and the request is merely slow rather than broken if labd is
+  unreachable or rate-limited. Made at learn.thedevlabs.io/settings#api-keys.
+  `AI_API_KEY` is still read as a fallback.
 
 The server refuses to boot in production without `MONGODB_URI`, so a missing
 database fails loudly at boot rather than on the first request.
@@ -164,15 +174,35 @@ database fails loudly at boot rather than on the first request.
 Do **not** set `VITE_API_URL` for this setup. Leave it unset so the UI calls
 `/api` on its own origin.
 
+## The labd AI step
+
+`backend/services/ai.service.js` calls labd at
+`https://agent.thedevlabs.io/v1/api/chat` with the resume text, the job
+description and the keyword pass's own result.
+
+Two rules shape that call. **The key stays on the server**: the browser calls our
+own `/api/parse`, and the key is attached only to the outbound labd request - it
+is never a `VITE_` variable, because Vite inlines those into the JS bundle anyone
+can read. And **the AI is an enhancement, not a dependency**: no key, a timeout,
+a rate limit, prose instead of JSON or a score of 140 all fall back to the
+built-in result rather than failing the request. The reply is untrusted text, so
+it is parsed defensively and validated field by field before it reaches the
+database or the UI.
+
+Contact details, measurable impact and resume length are checked by regex and keep
+their verdicts even when labd answers - those are exact questions a model has no
+advantage on. Only the score, the skills and the verdict come from labd.
+
+Optional overrides: `LABD_API_URL`, `LABD_MODEL` (the endpoint's own default is
+the right choice), and `LABD_TIMEOUT_MS` (45000 - generous, because a slow answer
+still beats no answer, as long as we do not hang forever).
+
 ## Not built yet
 
-The AI comparison. `backend/services/ai.service.js` is a seam that returns null,
-so the response already carries `aiSummary` - filling it in touches that one file
-and no route, controller or response shape.
-
-Rate limiting on uploads is stubbed with a TODO in `server.js`. Parsing a PDF and
-writing to the database is real work; a public endpoint should not do it
-unmetered.
+Rate limiting on uploads is stubbed with a TODO in `server.js`. Parsing a PDF,
+calling labd and writing to the database is real work - and `/api/parse` is where
+an anonymous visitor spends your labd allowance - so a public deploy should not
+accept that unmetered.
 
 ## Line endings
 

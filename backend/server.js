@@ -20,7 +20,7 @@ import routes from './routes/index.js'
 import { corsMiddleware } from './middleware/cors.middleware.js'
 import { handleUploadErrors } from './middleware/upload.middleware.js'
 import { errorHandler, notFound } from './middleware/error.middleware.js'
-import { PORT, assertProductionConfig, describeCors } from './config/env.js'
+import { PORT, assertProductionConfig, describeCors, describeAi } from './config/env.js'
 import { connectDB } from './database/connection.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -124,6 +124,7 @@ if (isDirectRun()) {
   app.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`)
     console.log(describeCors())
+    console.log(describeAi())
 
     if (!existsSync(DIST_DIR)) {
       console.log(

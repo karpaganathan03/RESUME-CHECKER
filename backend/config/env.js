@@ -30,12 +30,38 @@ export const CLIENT_ORIGINS = rawOrigins
 
 export const MONGODB_URI = process.env.MONGODB_URI || ''
 
-// Optional. When unset, every request is scored by the heuristic in
-// services/scoring.service.js and aiSummary comes back null.
-export const AI_API_KEY = process.env.AI_API_KEY || ''
+// --- labd AI --------------------------------------------------------------
+//
+// The labd API key, made at learn.thedevlabs.io/settings#api-keys. It lives on
+// this server and is NEVER sent to the browser: the frontend calls our own /api
+// route, and the key is only attached to the outbound request from here.
+//
+// LABD_API_KEY is the name to use. AI_API_KEY is still read as a fallback, so an
+// existing deployment does not break when this changes.
+export const LABD_API_KEY = process.env.LABD_API_KEY || process.env.AI_API_KEY || ''
+
+// The labd chat endpoint. Overridable so a test or a staging key can point
+// somewhere else without a code change.
+export const LABD_API_URL =
+  process.env.LABD_API_URL || 'https://agent.thedevlabs.io/v1/api/chat'
+
+// Optional. The endpoint accepts a `messages` array; leaving this empty uses the
+// service's default model, which is the right choice unless you have a reason.
+export const LABD_MODEL = process.env.LABD_MODEL || ''
+
+// How long to wait for the AI before falling back to the built-in score.
+// Generous: a cold model call is slower than a warm one, and a slow answer beats
+// no answer - as long as we do not hang forever.
+export const LABD_TIMEOUT_MS = Number(process.env.LABD_TIMEOUT_MS) || 45000
 
 export const NODE_ENV_VAR = NODE_ENV
 export const IS_PRODUCTION = isProduction
+
+/** Printed on boot, so the AI posture is never a guess. */
+export function describeAi() {
+  if (!LABD_API_KEY) return 'AI: no LABD_API_KEY set - scoring with the built-in rules'
+  return `AI: labd enabled at ${LABD_API_URL}`
+}
 
 /** Printed on boot, so the CORS posture is never a guess. */
 export function describeCors() {
@@ -51,6 +77,9 @@ export function describeCors() {
  * frontend was a separate Vercel project and every API call was cross-origin. In
  * the single-project deploy the UI and the API share an origin, so demanding it
  * would refuse to boot a perfectly correct deployment.
+ *
+ * The labd key is not required either: without it the app still scores every
+ * resume with the built-in rules, so a missing key degrades instead of breaking.
  */
 export function assertProductionConfig() {
   if (!isProduction) return

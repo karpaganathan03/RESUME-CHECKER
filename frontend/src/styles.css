@@ -348,6 +348,28 @@ body {
   margin: 0;
 }
 
+.verdict {
+  background: rgba(108, 140, 255, 0.08);
+  border: 1px solid rgba(108, 140, 255, 0.3);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.verdict h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.verdict p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
 .foot {
   text-align: center;
   color: var(--muted);

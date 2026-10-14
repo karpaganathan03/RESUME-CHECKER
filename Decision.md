@@ -8,4 +8,4 @@ backend folder should be in the order like container server.js, routes folder, c
 Delete unnecessary folder
 keep the project order professionaly like backend-->Database-->server-->Frontend 
 I didn't deploy the frontend seperately rather i had build both simulataneously according to my conditions make the possible changes in the project keep in mind i'm not going to deploy frontend and backend seperately i m going to deploy as a MERN stack project make alternatives regarding to that.
-below is the forma
+lets connect the labd AI and parse the resume and give the score for this i'm gonna use the  labd APIkey while deployment

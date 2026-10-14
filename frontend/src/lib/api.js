@@ -28,12 +28,15 @@ export const hasApi = true
 const OFFLINE_HINT = 'The backend was not reachable, so these numbers are the offline estimate.'
 
 /**
- * Send a resume + JD and get a score back.
+ * Send a resume + JD and get a score back. The timeout at the call site has to
+ * outlast the SERVER's own patience: with a labd key set, /api/parse waits up to
+ * LABD_TIMEOUT_MS (45s) for labd before falling back to the keyword score, so a
+ * shorter client timeout would throw away an answer that was about to arrive.
  *
  * @param {{ file: File, jobDescription: string, signal?: AbortSignal, timeoutMs?: number }} args
  * @returns {Promise<{ ok: true, data: object } | { ok: false, error: string }>}
  */
-export async function parseResume({ file, jobDescription, signal, timeoutMs = 20000 }) {
+export async function parseResume({ file, jobDescription, signal, timeoutMs = 60000 }) {
   const form = new FormData()
   // The field names must match what upload.single() and the controller read.
   form.append('resume', file)

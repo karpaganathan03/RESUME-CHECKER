@@ -184,6 +184,13 @@ export default function App() {
               </ul>
             </div>
 
+            {result.aiSummary && (
+              <div className="verdict">
+                <h3>AI verdict</h3>
+                <p>{result.aiSummary}</p>
+              </div>
+            )}
+
             <div className="skills">
               <SkillList title="Skills present" tone="good" items={result.present} />
               <SkillList title="Skills missing" tone="bad" items={result.missing} />
@@ -193,7 +200,7 @@ export default function App() {
       </main>
 
       <footer className="foot">
-        Mock scoring for the 0 to shipped demo - no AI yet, nothing is stored.
+        {result && result.engine === 'ai' ? 'Scored by labd AI, reviewed against the built-in rules.' : 'Scored by the built-in rules. Add LABD_API_KEY to enable the AI verdict.'}
       </footer>
     </div>
   )

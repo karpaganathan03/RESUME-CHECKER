@@ -1,13 +1,13 @@
 // The scoring rules.
 //
-// Today this is deterministic keyword matching: a resume and a JD are compared
-// against the vocabulary in skills.txt. There is no AI call, which is
-// deliberate - the AI comparison is a later step, and this layer is written so
-// it can be extended without touching the controller or the response shape.
+// This is the deterministic keyword pass: a resume and a JD are compared against
+// the vocabulary in skills.txt. It runs on every request, including the ones
+// where labd AI also answers, because it is the floor the AI result is merged
+// onto. If the AI is off, unreachable, or replies with nonsense, this is what
+// the learner gets.
 //
 // Everything here is pure: text in, result out, no network, no database. That
-// makes this the cheap part to unit test, and it is where the AI step will graft
-// on later.
+// makes it the cheap part to unit test.
 
 import { findSkills } from '../utils.js'
 import { loadSkillVocabulary } from '../config/skills.js'
@@ -28,7 +28,7 @@ export const WEIGHTS = {
 }
 
 // A resume with every keyword and no way to contact its author should not score
-// 100, so the score is not only skill matching.
+// 100, so skill matching is not the whole score.
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.]+/
 const PHONE = /(\+?\d[\d\s().-]{7,}\d)/
 // The trailing \b belongs on each word alternative, not after the group: a "%"
@@ -47,25 +47,54 @@ export function guessRole(jobDescription) {
 }
 
 /**
- * Score extracted resume text against a job description.
+ * Which skills the resume is judged against.
+ *
+ * Exported because the AI prompt is given the same list: the AI should review
+ * the same comparison the rules made, or the two answers are not comparable.
+ */
+export function targetSkills(jobDescription) {
+  const vocabulary = loadSkillVocabulary()
+  const demanded = findSkills(String(jobDescription || ''), vocabulary)
+  // The "< 3" guard stops a one-line JD ("we use React") from producing a
+  // meaningless 0-or-100 score against a single skill.
+  return demanded.length >= 3 ? demanded : vocabulary
+}
+
+/**
+ * The checklist shown next to the score.
+ *
+ * Separate from scoreResume because the controller rebuilds it after an AI reply
+ * replaces the skill lists: the contact/impact/length rules come from the resume
+ * text and do not change, but the skill-match rule has to be recalculated.
+ */
+export function buildChecks({ role, present, signals }) {
+  const { hasContact, hasQuantifiedImpact, lengthOk, targetCount } = signals
+  const skillMatch = targetCount ? present.length / targetCount : 0
+
+  return [
+    { label: 'Contact details found', pass: hasContact },
+    { label: `Matched at least 60% of ${role}'s skills`, pass: skillMatch >= 0.6 },
+    { label: 'Measurable impact in bullet points', pass: hasQuantifiedImpact },
+    { label: 'Resume text is a sensible length', pass: lengthOk },
+    {
+      label: `Compared against ${targetCount} skill${targetCount === 1 ? '' : 's'}`,
+      pass: targetCount > 0,
+    },
+  ]
+}
+
+/**
+ * Score extracted resume text against a job description with the built-in rules.
  *
  * @param {string} resumeText
  * @param {string} jobDescription
- * @returns {{ score: number, role: string, present: string[], missing: string[], checks: {label: string, pass: boolean}[] }}
+ * @returns {{ score: number, role: string, present: string[], missing: string[], checks: object[], signals: object }}
  */
 export function scoreResume(resumeText, jobDescription) {
-  const vocabulary = loadSkillVocabulary()
   const jd = String(jobDescription || '').trim()
   const role = jd ? guessRole(jd) : DEFAULT_ROLE
 
-  // Which skills are we judging against?
-  //   - With a JD: the skills the JD asks for.
-  //   - Without one: the whole vocabulary, so a resume is scored on its own.
-  // The "< 3" guard stops a one-line JD ("we use React") from producing a
-  // meaningless 0-or-100 score against a single skill.
-  const demanded = findSkills(jd, vocabulary)
-  const targets = demanded.length >= 3 ? demanded : vocabulary
-
+  const targets = targetSkills(jd)
   const present = findSkills(resumeText, targets)
   const missing = targets.filter((skill) => !present.includes(skill))
 
@@ -80,22 +109,22 @@ export function scoreResume(resumeText, jobDescription) {
     WEIGHTS.impact * (hasQuantifiedImpact ? 1 : 0) +
     WEIGHTS.length * (lengthOk ? 1 : 0)
 
-  const score = Math.round(100 * weighted)
+  const score = Math.max(0, Math.min(100, Math.round(100 * weighted)))
+
+  const signals = {
+    hasContact,
+    hasQuantifiedImpact,
+    lengthOk,
+    targetCount: targets.length,
+  }
 
   return {
-    score: Math.max(0, Math.min(100, score)),
+    score,
     role,
     present,
     missing,
-    checks: [
-      { label: 'Contact details found', pass: hasContact },
-      { label: `Matched at least 60% of ${role}'s skills`, pass: skillMatch >= 0.6 },
-      { label: 'Measurable impact in bullet points', pass: hasQuantifiedImpact },
-      { label: 'Resume text is a sensible length', pass: lengthOk },
-      {
-        label: `Compared against ${targets.length} skill${targets.length === 1 ? '' : 's'}`,
-        pass: targets.length > 0,
-      },
-    ],
+    checks: buildChecks({ role, present, signals }),
+    // Used by the controller, not sent to the client.
+    signals,
   }
 }
