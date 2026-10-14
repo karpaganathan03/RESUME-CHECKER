@@ -1,0 +1,24 @@
+{
+  "name": "0-to-shipped-resume-parser-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/scoring.test.js test/api.test.js"
+  },
+  "engines": {
+    "node": ">=22.3.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "mongoose": "^8.9.5",
+    "multer": "^2.0.0",
+    "pdf-parse": "^2.4.5"
+  }
+}

@@ -1,0 +1,13 @@
+# --- Front end ------------------------------------------------------------
+JavaScript
+TypeScript
+React
+Node.js
+Python
+SQL
+Docker
+AWS
+Git
+REST APIs
+Testing
+CI/CD

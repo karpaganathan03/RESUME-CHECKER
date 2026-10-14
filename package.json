@@ -1,0 +1,12 @@
+{
+  "name": "0-to-shipped-resume-parser",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Monorepo root: holds the shared skill vocabulary and the scripts that keep the two deployable projects in step.",
+  "scripts": {
+    "sync:skills": "node scripts/sync-skills.mjs",
+    "check:skills": "node scripts/sync-skills.mjs --check",
+    "install:all": "npm --prefix frontend install && npm --prefix backend install"
+  }
+}

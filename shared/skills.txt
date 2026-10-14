@@ -1,0 +1,23 @@
+# The shared skill vocabulary, one entry per line.
+#
+# This file exists because two copies of the same list drift. The frontend needs
+# it for its offline scoring, the backend needs it for real scoring, and a Vite
+# build cannot import a file from outside its own root (and cannot resolve a
+# path outside its root at all on Vercel, where the two are separate projects).
+# So the data lives once, here, and each side reads it.
+#
+# backend/skills.txt is the source of truth.
+
+# --- Front end ------------------------------------------------------------
+JavaScript
+TypeScript
+React
+Node.js
+Python
+SQL
+Docker
+AWS
+Git
+REST APIs
+Testing
+CI/CD

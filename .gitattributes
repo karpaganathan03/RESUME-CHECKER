@@ -1,0 +1,24 @@
+# Repo-wide defaults. This is the fix for the CRLF problem.
+#
+# Without this file, git stores whatever line endings the committing machine
+# used. Windows commits CRLF, and then every file has a ^M at the end of each
+# line, diffs are noisy, and a shell script or a Docker context breaks in ways
+# that are hard to trace back to line endings.
+#
+# text=auto: git normalises to LF in the repository and converts back to the
+# platform's endings on checkout. That is what you want for source code.
+* text=auto eol=lf
+
+# Windows-only files must keep CRLF, or cmd.exe will not run them.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Never touch line endings in binaries - the conversion corrupts them.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

@@ -1,0 +1,28 @@
+# Dependencies and build output - never committed.
+node_modules/
+dist/
+dist-ssr/
+
+# Local environment files. These hold credentials; only the example files are
+# tracked, so a secret never lands in a commit.
+.env
+.env.local
+.env.*.local
+!**/example.env
+!**/.env.example
+
+# Vercel
+.vercel
+
+# Editor and OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
