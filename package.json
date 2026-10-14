@@ -3,10 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Monorepo root: holds the shared skill vocabulary and the scripts that keep the two deployable projects in step.",
+  "description": "0 to shipped resume parser - one deployable: Express serves the API and the built React UI.",
+  "engines": {
+    "node": ">=22.3.0"
+  },
   "scripts": {
+    "install:all": "npm --prefix frontend install && npm --prefix backend install",
+    "build": "npm --prefix frontend run build",
+    "start": "node backend/server.js",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "test": "npm --prefix backend test",
     "sync:skills": "node scripts/sync-skills.mjs",
-    "check:skills": "node scripts/sync-skills.mjs --check",
-    "install:all": "npm --prefix frontend install && npm --prefix backend install"
+    "check:skills": "node scripts/sync-skills.mjs --check"
   }
 }

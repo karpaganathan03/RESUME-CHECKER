@@ -1,7 +1,7 @@
 // All routes, mounted once at /api.
 //
 // Nothing here may live outside /api. The frontend calls ${VITE_API_URL}/api/...
-// and the Vercel rewrite in frontend/vercel.json only proxies /api/*, so a route
+// and the Vercel rewrite in the root vercel.json only sends /api/* here, so a route
 // registered as a bare /health would answer on localhost and 404 in production.
 
 import { Router } from 'express'

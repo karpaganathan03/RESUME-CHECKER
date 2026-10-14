@@ -7,3 +7,5 @@ add vercel.json file to backend and frontend folder, I am going to create two pr
 backend folder should be in the order like container server.js, routes folder, controller.js, service folder, config folder, middleware folder, and util.js
 Delete unnecessary folder
 keep the project order professionaly like backend-->Database-->server-->Frontend 
+I didn't deploy the frontend seperately rather i had build both simulataneously according to my conditions make the possible changes in the project keep in mind i'm not going to deploy frontend and backend seperately i m going to deploy as a MERN stack project make alternatives regarding to that.
+below is the forma

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // The dev proxy is what lets the frontend call a same-origin "/api/parse".
 //
-// In production, frontend/vercel.json rewrites /api/* to the backend's URL, so
+// In production, the root vercel.json rewrites /api/* to backend/server.js, so
 // the browser never makes a cross-origin request and no CORS applies. Proxying
 // in dev makes localhost behave the same way - same path, same relative fetch -
 // so a bug in the routing shows up locally instead of only after deploy.

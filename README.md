@@ -6,14 +6,21 @@ skills present on the resume, and the skills missing from it.
 The AI comparison is a later step. Today the score comes from deterministic
 keyword matching, so the whole thing runs with no API key and no AI cost.
 
+**One deployable.** Express serves the API *and* the built React UI from the same
+process, on the same origin. There is no second Vercel project, no CORS, and no
+cross-origin URL to keep in sync.
+
 ## Structure
 
 ```
-backend/          the API - Express, MongoDB
+package.json        root scripts: build, start, test, sync:skills
+vercel.json         the single deploy config: install, build, /api rewrite
+
+backend/          the API and the web server - Express, MongoDB
   database/       Database: the connection and the models, together
     connection.js   cached mongoose connection
     models/         one file per collection
-  server.js       Server: builds the Express app, starts the listener
+  server.js       Server: builds the app, serves the API and the built UI
   routes/         path -> controller
   controllers/    request in, response out
   services/       the actual work (PDF text, scoring, AI seam)
@@ -22,11 +29,11 @@ backend/          the API - Express, MongoDB
   utils.js        small shared helpers
   test/           node:test suites
 
-frontend/         the UI - React + Vite
+frontend/         the UI - React + Vite, built into frontend/dist
   src/
     App.jsx         the page: upload, job description, report
     lib/api.js      the only place the backend is called
-    lib/scoring.js  offline scoring, used when there is no backend
+    lib/scoring.js  offline scoring, used when the API is unreachable
     lib/skills.txt  generated - do not edit
 
 shared/skills.txt   the one skill vocabulary both sides use
@@ -39,44 +46,59 @@ Read the project in this order: it runs the same way.
 
 **backend → Database → Server → Frontend**
 
-1. **backend/** is the deployable API. It is the only thing that talks to
-   MongoDB. Nothing above the database layer imports mongoose directly.
+1. **backend/** is the deployable app. It is the only thing that talks to
+   MongoDB; nothing above the database layer imports mongoose directly.
 2. **Database/** (`backend/database/`) is the connection and the models. The
    connection is cached on `globalThis`, because a serverless function reuses one
    warm instance for many requests and reconnecting per request exhausts Atlas.
-3. **Server/** (`backend/server.js`) builds the Express app and mounts every
-   route under `/api`. It exports the app for Vercel and only binds a port when
-   run directly.
-4. **Frontend/** calls it. `VITE_API_URL` decides where; unset means it scores in
-   the browser and works with no backend at all.
+3. **Server/** (`backend/server.js`) mounts the API under `/api`, then serves
+   `frontend/dist` and falls back to `index.html` for client-side routes.
+4. **Frontend/** calls `/api` relatively. Because one server answers both, the
+   request is same-origin and CORS never applies.
+
+The mount order in step 3 is load-bearing: the API is registered **before** the
+static handler. Reversed, an unknown `/api` path would return the SPA's HTML and
+the UI would report "the server replied in a shape the UI cannot read".
+`backend/test/static.test.js` exists to keep that true.
 
 ## Running it
 
-```bash
-npm run install:all            # installs frontend/ and backend/
+Development runs two processes for fast reloads - Vite for the UI, Node for the
+API. Production runs one.
 
-npm --prefix backend run dev   # API on http://localhost:5000
-npm --prefix frontend run dev  # UI  on http://localhost:5173
+```bash
+npm run install:all
+
+# terminal 1
+npm --prefix backend run dev     # API on http://localhost:5000
+
+# terminal 2
+npm --prefix frontend run dev    # UI on http://localhost:5173, proxying /api
 ```
 
-With no configuration the frontend still works - it scores in the browser and
-says so on the page. That is the "mock design" stage: no server, no database, no
-API key. Point `VITE_API_URL` at the backend to switch to real PDF parsing.
+To run exactly what deploys - one process, one port:
 
-Copy an env example to start configuring:
+```bash
+npm run build     # builds the UI into frontend/dist
+npm start         # http://localhost:5000 serves the UI and the API
+```
+
+With no `MONGODB_URI` the server still starts and scores resumes; the result just
+is not saved. If the API is unreachable the UI falls back to scoring in the
+browser, which is the original "mock design" behaviour.
+
+Config:
 
 ```bash
 cp backend/example.env backend/.env
-cp frontend/example.env frontend/.env.local
 ```
 
 ## The skill list
 
 The vocabulary lives once, in `shared/skills.txt`. It cannot be imported directly
-by both projects, because Vercel deploys `frontend/` and `backend/` from two
-separate roots, and a build cannot resolve a file above its own root - so a
-`../shared/` import works locally and breaks in production, which is the worst
-possible ordering. It is copied instead:
+by both projects, because Vercel builds the two from separate roots and a build
+cannot resolve a file above its own root - so a `../shared/` import works locally
+and breaks in the deploy. It is copied instead:
 
 ```bash
 npm run sync:skills    # write the copies
@@ -93,9 +115,9 @@ Edit `shared/skills.txt`, then run the sync. Do not edit the generated copies.
 | POST   | `/api/parse`  | Multipart: `resume` (PDF), `jobDescription`.   |
 | GET    | `/api/scores` | Recent results, `?limit=` up to 50.            |
 
-Everything is mounted under `/api`, and it has to stay that way: the frontend
-calls `/api/...` and the Vercel rewrite only proxies `/api/*`, so a route at a
-bare `/health` would answer on localhost and 404 in production.
+Everything is mounted under `/api`, and it has to stay that way: the rewrite in
+the root `vercel.json` only sends `/api/*` to the app, and the frontend calls
+`/api/...` relative paths.
 
 `POST /api/parse` returns 201 with the score, `present`, `missing`, `checks` and
 `aiSummary` (null until the AI step is wired up). It returns 415 for a non-PDF,
@@ -109,34 +131,38 @@ we do not need turns a scoring app into a liability.
 ## Tests
 
 ```bash
-npm --prefix backend test
+npm test
 ```
 
-Pure scoring rules in `backend/test/scoring.test.js`, and HTTP behaviour plus the
-pdf-parse import shape in `backend/test/api.test.js`.
+- `backend/test/scoring.test.js` - the scoring rules, pure functions
+- `backend/test/api.test.js` - HTTP behaviour and the pdf-parse import shape
+- `backend/test/static.test.js` - one server serves the UI and the API; skips
+  itself when `frontend/dist` does not exist yet
 
-## Deploying to Vercel (two projects)
+## Deploying to Vercel (one project)
 
-**Backend** - root directory `backend`. Environment variables:
+Import the repository as a **single** Vercel project with the **root directory**
+left at the repo root. `vercel.json` then handles everything:
 
-- `MONGODB_URI` - required
-- `CLIENT_ORIGINS` - required, comma-separated, **no trailing slash**. A trailing
-  slash never matches the `Origin` header the browser sends, and the failure
-  looks like a mystery CORS error with a config that reads correctly.
+- `installCommand` installs both `frontend/` and `backend/`
+- `buildCommand` builds the UI into `frontend/dist`
+- `outputDirectory` is that folder
+- the rewrite sends `/api/*` to `backend/server.js`, which Vercel runs as a
+  serverless function
+
+Environment variables (Vercel dashboard, not a committed file):
+
+- `MONGODB_URI` - **required**
+- `CLIENT_ORIGINS` - **optional now**. Only needed if something on a different
+  origin calls the API. Comma-separated, no trailing slash, because a trailing
+  slash never matches the `Origin` header the browser sends.
 - `AI_API_KEY` - optional, leave unset for now
 
-The server refuses to boot in production without `MONGODB_URI` and
-`CLIENT_ORIGINS`, so a bad config fails immediately instead of on the first
-request.
+The server refuses to boot in production without `MONGODB_URI`, so a missing
+database fails loudly at boot rather than on the first request.
 
-**Frontend** - root directory `frontend`. Set `frontend/vercel.json`'s rewrite
-`destination` to your backend URL, and `VITE_API_URL=/api` so the browser calls
-same-origin and no CORS applies at all.
-
-That rewrite is the piece to get right: `VITE_API_URL=/api` plus the rewrite
-means one code path in dev and in production. Pointing `VITE_API_URL` straight at
-the backend URL also works, but then CORS is load-bearing and `CLIENT_ORIGINS`
-has to be exactly right.
+Do **not** set `VITE_API_URL` for this setup. Leave it unset so the UI calls
+`/api` on its own origin.
 
 ## Not built yet
 

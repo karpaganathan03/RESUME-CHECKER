@@ -11,12 +11,16 @@ const isProduction = NODE_ENV === 'production'
 
 export const PORT = Number(process.env.PORT) || 5000
 
-// Where the browser is allowed to call us from.
+// Where else the browser is allowed to call the API from.
 //
-// CLIENT_ORIGINS is a comma-separated list. An empty list in development means
-// "reflect whatever origin asked", which keeps a local Vite port that moved from
-// 5173 to 5174 working. In production an empty list is a locked door, so it is
-// required there instead of silently allowing nothing.
+// This is OPTIONAL now, and that is the single-project deployment correction.
+// The frontend and this API are one Vercel project, so the browser calls the API
+// on its own origin and no CORS applies at all. CLIENT_ORIGINS only needs a value
+// if you also call the API from a DIFFERENT origin - another site, a mobile app,
+// or a Vercel preview URL.
+//
+// Comma-separated, and no trailing slash: an origin is scheme + host + port, so
+// "https://app.com/" never matches the Origin header the browser sends.
 const rawOrigins = (process.env.CLIENT_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
@@ -33,25 +37,22 @@ export const AI_API_KEY = process.env.AI_API_KEY || ''
 export const NODE_ENV_VAR = NODE_ENV
 export const IS_PRODUCTION = isProduction
 
-/**
- * A comma-separated list is the one string shape that breaks CORS silently:
- * pasting both the preview and production URL into a single value causes the
- * header to echo an origin the browser never sent, and the preflight fails.
- * Reading it back here makes that visible on boot.
- */
+/** Printed on boot, so the CORS posture is never a guess. */
 export function describeCors() {
   if (CLIENT_ORIGINS.length > 0) return `CORS allowing: ${CLIENT_ORIGINS.join(', ')}`
-  if (IS_PRODUCTION) {
-    return 'CORS: no CLIENT_ORIGINS set in production - browsers will be blocked from calling this API'
-  }
-  return 'CORS: no CLIENT_ORIGINS set, allowing any origin (development only)'
+  return 'CORS: same-origin only (the UI is served by this same app)'
 }
 
-/** Called once at startup so a bad production config fails at boot, not at request time. */
+/**
+ * Called once at startup so a bad production config fails at boot rather than on
+ * the first request.
+ *
+ * CLIENT_ORIGINS is deliberately NOT required here. It used to be, back when the
+ * frontend was a separate Vercel project and every API call was cross-origin. In
+ * the single-project deploy the UI and the API share an origin, so demanding it
+ * would refuse to boot a perfectly correct deployment.
+ */
 export function assertProductionConfig() {
-  if (!IS_PRODUCTION) return
+  if (!isProduction) return
   if (!MONGODB_URI) throw new Error('MONGODB_URI is required in production.')
-  if (CLIENT_ORIGINS.length === 0) {
-    throw new Error('CLIENT_ORIGINS is required in production (comma-separated frontend URLs).')
-  }
 }
