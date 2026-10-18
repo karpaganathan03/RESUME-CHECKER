@@ -4,8 +4,7 @@
     "backend": {
       "root": "backend",
       "framework": "express",
-      "entrypoint": "server.js",
-      "includeFiles": "skills.txt"
+      "entrypoint": "server.js"
     },
     "frontend": {
       "root": "frontend",
