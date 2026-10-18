@@ -1,5 +1,5 @@
 {
-  "name": "0-to-shipped-resume-parser-backend",
+  "name": "ats-checker-backend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test test/scoring.test.js test/api.test.js test/ai.test.js test/static.test.js"
+    "test": "node --test test/scoring.test.js test/api.test.js test/ai.test.js test/static.test.js test/pdf.test.js"
   },
   "engines": {
     "node": ">=22.3.0"

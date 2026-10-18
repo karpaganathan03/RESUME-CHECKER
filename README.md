@@ -1,136 +1,111 @@
-# 0 to shipped - Resume Parser
+# ATS Checker
 
-Upload a resume PDF, paste a job description, get a match score out of 100, the
-skills present on the resume, and the skills missing from it.
+Upload a resume PDF, paste a job description, and get an ATS match score out of
+100, the skills your resume **has**, and the skills it is **missing**. An optional
+labd AI step adds a written verdict.
 
-Scoring runs twice, and the built-in pass is the floor. A deterministic keyword
-pass always scores the resume; with `LABD_API_KEY` set, labd reviews the same
-resume against the same job description and its score, skills and written verdict
-replace the keyword ones. With no key the app behaves exactly as before, which is
-why nothing here needs an API key to run or to test.
+One deployable: Express serves the API *and* the built React UI from the same
+process and the same origin - one Vercel project, no CORS.
 
-**One deployable.** Express serves the API *and* the built React UI from the same
-process, on the same origin. There is no second Vercel project, no CORS, and no
-cross-origin URL to keep in sync.
+## Quick start (Windows, macOS, Linux)
 
-## Structure
-
-```
-package.json        root scripts: build, start, test, sync:skills
-vercel.json         the single deploy config: install, build, /api rewrite
-
-backend/          the API and the web server - Express, MongoDB
-  database/       Database: the connection and the models, together
-    connection.js   cached mongoose connection
-    models/         one file per collection
-  server.js       Server: builds the app, serves the API and the built UI
-  routes/         path -> controller
-  controllers/    request in, response out
-  services/       the actual work (PDF text, scoring, labd AI)
-  config/         env vars, the skill vocabulary loader
-  middleware/     CORS, uploads, error handling
-  utils.js        small shared helpers
-  test/           node:test suites
-
-frontend/         the UI - React + Vite, built into frontend/dist
-  src/
-    App.jsx         the page: upload, job description, report
-    lib/api.js      the only place the backend is called
-    lib/scoring.js  offline scoring, used when the API is unreachable
-    lib/skills.txt  generated - do not edit
-
-shared/skills.txt   the one skill vocabulary both sides use
-scripts/            sync-skills.mjs - copies shared/ into each project
-```
-
-## The flow
-
-Read the project in this order: it runs the same way.
-
-**backend → Database → Server → Frontend**
-
-1. **backend/** is the deployable app. It is the only thing that talks to
-   MongoDB; nothing above the database layer imports mongoose directly.
-2. **Database/** (`backend/database/`) is the connection and the models. The
-   connection is cached on `globalThis`, because a serverless function reuses one
-   warm instance for many requests and reconnecting per request exhausts Atlas.
-3. **Server/** (`backend/server.js`) mounts the API under `/api`, then serves
-   `frontend/dist` and falls back to `index.html` for client-side routes.
-4. **Frontend/** calls `/api` relatively. Because one server answers both, the
-   request is same-origin and CORS never applies.
-
-The mount order in step 3 is load-bearing: the API is registered **before** the
-static handler. Reversed, an unknown `/api` path would return the SPA's HTML and
-the UI would report "the server replied in a shape the UI cannot read".
-`backend/test/static.test.js` exists to keep that true.
-
-## Running it
-
-Development runs two processes for fast reloads - Vite for the UI, Node for the
-API. Production runs one.
+Needs **Node 22.3 or newer** (`node -v`).
 
 ```bash
-npm run install:all
-
-# terminal 1
-npm --prefix backend run dev     # API on http://localhost:5000
-
-# terminal 2
-npm --prefix frontend run dev    # UI on http://localhost:5173, proxying /api
+npm run install:all     # installs frontend/ and backend/ (once)
+npm run setup           # creates backend/.env (once)
+npm run dev             # starts the API and the UI together
 ```
 
-To run exactly what deploys - one process, one port:
+Then open **http://localhost:5173**. That is the app.
+
+> Do not open the project folder with Live Server, `serve` or any static file
+> server. There is no `index.html` at the root, so all you will see is a list of
+> folders. The app only exists once `npm run dev` (or `npm start`) is running.
+
+Run exactly what gets deployed - one process, one port:
 
 ```bash
-npm run build     # builds the UI into frontend/dist
-npm start         # http://localhost:5000 serves the UI and the API
+npm run build           # builds the UI into frontend/dist
+npm start               # http://localhost:5000 serves the UI and the API
 ```
 
-With no `MONGODB_URI` the server still starts and scores resumes; the result just
-is not saved. If the API is unreachable the UI falls back to scoring in the
-browser, which is the original "mock design" behaviour.
+## Configuration - `backend/.env`
 
-Config:
+`npm run setup` creates it from `backend/example.env`. Everything is optional for
+a first run:
 
-```bash
-cp backend/example.env backend/.env
+| Variable        | What it does                                                                 |
+| --------------- | ---------------------------------------------------------------------------- |
+| `MONGODB_URI`   | Saves each result to MongoDB. Empty = scoring works, nothing is saved.       |
+| `LABD_API_KEY`  | Turns on the labd AI score, skills and written verdict. Empty = built-in rules. |
+| `PORT`          | API port, default 5000.                                                      |
+| `CLIENT_ORIGINS`| Only if a *different* origin calls the API. Leave empty normally.            |
+
+Keys live on the server only. Never put them in a `VITE_` variable: Vite copies
+those into the JavaScript bundle that every visitor can read. Restart the server
+after editing `.env`.
+
+## How it works
+
+```
+backend/            API + web server (Express, MongoDB)
+  server.js         builds the app, mounts /api, then serves frontend/dist
+  routes/           path -> controller
+  controllers/      request in, response out
+  services/         pdf.service (PDF text), scoring.service (rules), ai.service (labd)
+  database/         cached mongoose connection + models
+  config/           env vars, skill vocabulary loader
+  middleware/       CORS, uploads, errors
+  utils.js          shared helpers (skill matching lives here)
+  test/             node:test suites
+frontend/           React + Vite UI, built into frontend/dist
+api/index.js        Vercel's entry point: hands /api/* to backend/server.js
+shared/skills.txt   the skill vocabulary you edit
+scripts/            dev.mjs, setup.mjs, sync-skills.mjs
 ```
 
-## The skill list
+Request flow: the browser posts the PDF and job description to `/api/parse` ->
+`pdf.service` extracts the text -> `scoring.service` scores it with the keyword
+rules -> if `LABD_API_KEY` is set, `ai.service` asks labd to review it and its
+score replaces the keyword one (any labd failure falls back silently to the
+keyword score) -> the result is saved to MongoDB if configured -> the UI shows it.
 
-The vocabulary lives once, in `shared/skills.txt`. It cannot be imported directly
-by both projects, because Vercel builds the two from separate roots and a build
-cannot resolve a file above its own root - so a `../shared/` import works locally
-and breaks in the deploy. It is copied instead:
+The API is mounted before the static handler on purpose. Reversed, an unknown
+`/api` path would return the SPA's HTML. `test/static.test.js` guards this.
 
-```bash
-npm run sync:skills    # write the copies
-npm run check:skills   # fail if they have drifted - use this in CI
-```
+**Scoring** (built-in rules): skills 65%, contact details 15%, measurable impact
+(numbers, percentages) 10%, sensible length 10%. The skills compared are the ones
+the job description mentions; if it mentions fewer than 3 known skills, a 12-skill
+general set is used so a vague description does not give a 0-or-100 result.
 
-Edit `shared/skills.txt`, then run the sync. Do not edit the generated copies.
+**Skills.** Edit `shared/skills.txt`. One per line: `Canonical | alias | alias`, so
+`Postgres` on a resume satisfies `PostgreSQL` in a job description. Matching is
+case-insensitive and whole-word: `Git` does not match "digital", `Java` does not
+match "JavaScript", and the alias `JS` does not match inside "Node.js". `npm run
+build` copies the file into `backend/` and `frontend/`; `npm test` fails if the
+copies have drifted.
 
 ## API
 
-| Method | Path          | Purpose                                       |
-| ------ | ------------- | --------------------------------------------- |
-| GET    | `/api/health` | Liveness. No database, no PDF library.         |
-| POST   | `/api/parse`  | Multipart: `resume` (PDF), `jobDescription`.   |
-| GET    | `/api/scores` | Recent results, `?limit=` up to 50.            |
+| Method | Path          | Purpose                                         |
+| ------ | ------------- | ----------------------------------------------- |
+| GET    | `/api/health` | Liveness. No database, no PDF library.          |
+| POST   | `/api/parse`  | Multipart: `resume` (PDF), `jobDescription`.    |
+| GET    | `/api/scores` | Recent saved results, `?limit=` up to 50.       |
 
-Everything is mounted under `/api`, and it has to stay that way: the rewrite in
-the root `vercel.json` only sends `/api/*` to the app, and the frontend calls
-`/api/...` relative paths.
+`POST /api/parse` returns 201 with `score`, `present`, `missing`, `checks`,
+`engine` (`heuristic` or `ai`), `aiSummary`, and `persisted`. Errors: 415 not a
+PDF, 413 over 4 MB, 422 no readable text (a scan or image).
 
-`POST /api/parse` returns 201 with the score, `present`, `missing`, `checks`,
-`engine` (`heuristic` or `ai`) and `aiSummary` (null unless the labd key is set).
-It returns 415 for a non-PDF, 413 for a file over 5 MB, and 422 for a PDF with no
-extractable text - a scan or an image, which is a user problem rather than a
-server error.
+The PDF itself and its text are never stored - only the score and matched skills.
+The limit is 4 MB because Vercel rejects larger request bodies before Express runs.
 
-Storage is deliberate: the score and the matched skills are saved, the resume
-text and the raw PDF are not. A resume is full of personal data, and keeping text
-we do not need turns a scoring app into a liability.
+## If the backend is down
+
+The UI shows a clearly labelled **demo estimate**. It does not read your PDF; it is
+a placeholder so the page is not empty. If the backend is reachable but rejects the
+file, you get its real error message instead - never a made-up score.
 
 ## Tests
 
@@ -138,86 +113,39 @@ we do not need turns a scoring app into a liability.
 npm test
 ```
 
-- `backend/test/scoring.test.js` - the scoring rules, pure functions
-- `backend/test/api.test.js` - HTTP behaviour and the pdf-parse import shape
-- `backend/test/ai.test.js` - the labd reply parsing, validation and the merge
-  with the built-in score; no network calls
-- `backend/test/static.test.js` - one server serves the UI and the API; skips
-  itself when `frontend/dist` does not exist yet
+Covers scoring rules, skill matching, a real in-memory PDF through the whole
+`/api/parse` route, the labd reply parsing and merge (no network), and that one
+server serves both UI and API.
 
-## Deploying to Vercel (one project)
+## Deploying to Vercel as Two Separate Projects (Recommended)
 
-Import the repository as a **single** Vercel project with the **root directory**
-left at the repo root. `vercel.json` then handles everything:
+### 1. Backend Project
+1. Import the repository into Vercel.
+2. In the project settings, set **Root Directory** to `backend`.
+3. Add Environment Variables:
+   - `MONGODB_URI`: Your MongoDB Atlas connection string.
+   - `CLIENT_ORIGINS`: Allowed origins (e.g. `*` or `https://your-frontend-project.vercel.app`).
+   - `LABD_API_KEY`: (Optional) Your labd API key.
+4. Deploy! Your backend API will be live at `https://your-backend-project.vercel.app`.
 
-- `installCommand` installs both `frontend/` and `backend/`
-- `buildCommand` builds the UI into `frontend/dist`
-- `outputDirectory` is that folder
-- the rewrite sends `/api/*` to `backend/server.js`, which Vercel runs as a
-  serverless function
+### 2. Frontend Project
+1. Import the same repository into Vercel as a second project.
+2. In the project settings, set **Root Directory** to `frontend`.
+3. Framework Preset: **Vite**.
+4. Add Environment Variable:
+   - `VITE_API_URL`: The URL of your deployed backend (e.g. `https://your-backend-project.vercel.app`).
+5. Deploy! Your frontend UI is live at `https://your-frontend-project.vercel.app`.
 
-Environment variables (Vercel dashboard, not a committed file):
+---
 
-- `MONGODB_URI` - **required**
-- `CLIENT_ORIGINS` - **optional now**. Only needed if something on a different
-  origin calls the API. Comma-separated, no trailing slash, because a trailing
-  slash never matches the `Origin` header the browser sends.
-- `LABD_API_KEY` - optional. Absent, every resume is scored by the built-in
-  keyword pass. Set, labd adds the score, the written verdict and a corrected
-  skill breakdown, and the request is merely slow rather than broken if labd is
-  unreachable or rate-limited. Made at learn.thedevlabs.io/settings#api-keys.
-  `AI_API_KEY` is still read as a fallback.
+## Deploying to Vercel (Alternative: Single Monorepo Project)
 
-The server refuses to boot in production without `MONGODB_URI`, so a missing
-database fails loudly at boot rather than on the first request.
-
-Do **not** set `VITE_API_URL` for this setup. Leave it unset so the UI calls
-`/api` on its own origin.
-
-## The labd AI step
-
-`backend/services/ai.service.js` calls labd at
-`https://agent.thedevlabs.io/v1/api/chat` with the resume text, the job
-description and the keyword pass's own result.
-
-Two rules shape that call. **The key stays on the server**: the browser calls our
-own `/api/parse`, and the key is attached only to the outbound labd request - it
-is never a `VITE_` variable, because Vite inlines those into the JS bundle anyone
-can read. And **the AI is an enhancement, not a dependency**: no key, a timeout,
-a rate limit, prose instead of JSON or a score of 140 all fall back to the
-built-in result rather than failing the request. The reply is untrusted text, so
-it is parsed defensively and validated field by field before it reaches the
-database or the UI.
-
-Contact details, measurable impact and resume length are checked by regex and keep
-their verdicts even when labd answers - those are exact questions a model has no
-advantage on. Only the score, the skills and the verdict come from labd.
-
-Optional overrides: `LABD_API_URL`, `LABD_MODEL` (the endpoint's own default is
-the right choice), and `LABD_TIMEOUT_MS` (45000 - generous, because a slow answer
-still beats no answer, as long as we do not hang forever).
+1. Push the repo and import it as **one** Vercel project, root directory = repo root.
+2. Add environment variables in the Vercel dashboard: `MONGODB_URI` and `LABD_API_KEY` (optional).
+3. In MongoDB Atlas, allow network access from anywhere (`0.0.0.0/0`).
+4. Deploy (do not set `VITE_API_URL`).
 
 ## Not built yet
 
-Rate limiting on uploads is stubbed with a TODO in `server.js`. Parsing a PDF,
-calling labd and writing to the database is real work - and `/api/parse` is where
-an anonymous visitor spends your labd allowance - so a public deploy should not
-accept that unmetered.
-
-## Line endings
-
-Every file was committed as CRLF, which puts a `^M` at the end of every line,
-makes diffs noisy, and breaks shell scripts and Docker contexts in ways that are
-hard to trace back. `.gitattributes` fixes it going forward (`* text=auto eol=lf`,
-with `*.bat` kept on CRLF because cmd.exe needs it).
-
-To normalise what is already there, once, with a clean working tree:
-
-```bash
-git add --renormalize .
-git status
-```
-
-Check `git status` before committing - that command can touch every file in the
-repo, and you want to see what it did. A `.vscode/settings.json` with
-`"files.eol": "\n"` stops new files from arriving as CRLF in the first place.
+Rate limiting on `/api/parse` is a TODO in `server.js`. Each upload costs a PDF
+parse and possibly a labd call, so add `express-rate-limit` before going public.

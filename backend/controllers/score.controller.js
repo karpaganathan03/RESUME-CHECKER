@@ -24,6 +24,20 @@ import { MAX_FILE_MB } from '../middleware/upload.middleware.js'
 
 const MAX_JD_CHARS = 20000
 
+// How long a request will wait for MongoDB before answering without saving.
+// serverSelectionTimeoutMS is 8s, and an unreachable database would otherwise add
+// all of that to every single score. The connection attempt keeps going in the
+// background, so a later request can still find it ready.
+const DB_WAIT_MS = 3000
+
+function withTimeout(promise, ms, message) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 /**
  * Combine the AI verdict with the built-in pass.
  *
@@ -133,7 +147,7 @@ export async function parseResume(req, res, next) {
     // database hiccup must not take that away from them.
     let saved = null
     try {
-      await connectDB()
+      await withTimeout(connectDB(), DB_WAIT_MS, 'MongoDB did not answer in time')
       saved = await Score.create({
         // basename strips any path a crafted filename might carry.
         fileName: path.basename(req.file.originalname || 'resume.pdf'),

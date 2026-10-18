@@ -1,23 +1,144 @@
-# The shared skill vocabulary, one entry per line.
+# The skill vocabulary, one entry per line.
 #
-# This file exists because two copies of the same list drift. The frontend needs
-# it for its offline scoring, the backend needs it for real scoring, and a Vite
-# build cannot import a file from outside its own root (and cannot resolve a
-# path outside its root at all on Vercel, where the two are separate projects).
-# So the data lives once, here, and each side reads it.
+# Format:  Canonical name | alias | alias
+# The first name is what the report shows. Aliases are other spellings an ATS (and
+# a human) would treat as the same skill, so "Postgres" on a resume satisfies
+# "PostgreSQL" in a job description. Matching is case-insensitive and whole-word.
 #
-# backend/skills.txt is the source of truth.
+# This is the file you edit. `npm run sync:skills` copies it into backend/ and
+# frontend/src/lib/, and `npm run build` / `npm run dev` run that copy for you.
+# Do not edit the generated copies.
+
+# --- Languages ------------------------------------------------------------
+JavaScript | JS | ECMAScript | ES6
+TypeScript | TS
+Python
+Java
+C++ | CPP
+C#  | CSharp
+Golang
+Rust
+PHP
+Ruby
+Kotlin
+Swift
+Scala
+SQL
+HTML | HTML5
+CSS | CSS3
 
 # --- Front end ------------------------------------------------------------
-JavaScript
-TypeScript
-React
-Node.js
-Python
-SQL
+React | React.js | ReactJS
+Next.js | NextJS
+Vue | Vue.js | VueJS
+Angular | AngularJS
+Svelte
+Redux
+Tailwind CSS | Tailwind
+Sass | SCSS
+Webpack
+Vite
+Responsive Design
+Accessibility | WCAG | a11y
+
+# --- Back end -------------------------------------------------------------
+Node.js | Node | NodeJS
+Express.js | ExpressJS
+NestJS | Nest.js
+Django
+Flask
+FastAPI
+Spring Boot | Spring Framework
+.NET | ASP.NET | dotnet
+Laravel
+Ruby on Rails | Rails
+REST APIs | REST | RESTful | REST API
+GraphQL
+gRPC
+Microservices
+WebSockets | WebSocket
+Authentication | OAuth | JWT | SSO
+
+# --- Data -----------------------------------------------------------------
+MongoDB | Mongo
+PostgreSQL | Postgres
+MySQL
+SQLite
+Redis
+Elasticsearch
+DynamoDB
+Firebase
+Kafka
+RabbitMQ
+Data Modeling | Data Modelling | Schema Design
+ETL
+Pandas
+NumPy
+Spark | Apache Spark
+Tableau
+Power BI
+Excel | Microsoft Excel
+
+# --- Cloud and DevOps -----------------------------------------------------
+AWS | Amazon Web Services
+Azure | Microsoft Azure
+GCP | Google Cloud
 Docker
-AWS
+Kubernetes | K8s
+Terraform
+Ansible
+Linux
+Nginx
+Serverless | Lambda
+Vercel
+Heroku
+CI/CD | CI CD | Continuous Integration | Continuous Delivery | Continuous Deployment
+Jenkins
+GitHub Actions
 Git
-REST APIs
-Testing
-CI/CD
+GitHub
+GitLab
+Monitoring | Observability | Prometheus | Grafana
+
+# --- Quality --------------------------------------------------------------
+Testing | Unit Testing | Integration Testing | TDD
+Jest
+Vitest
+Cypress
+Playwright
+Selenium
+JUnit
+Pytest
+Code Review
+Debugging
+
+# --- AI and ML ------------------------------------------------------------
+Machine Learning | ML
+Deep Learning
+TensorFlow
+PyTorch
+scikit-learn | sklearn
+NLP | Natural Language Processing
+LLM | LLMs | Large Language Models
+Prompt Engineering
+Generative AI | GenAI
+
+# --- Mobile ---------------------------------------------------------------
+React Native
+Flutter
+Android
+iOS
+
+# --- Practices and soft skills -------------------------------------------
+Agile | Scrum | Kanban
+Jira
+Figma
+UI/UX | UX | User Experience
+System Design
+Performance Optimization
+Security | Cybersecurity
+Leadership | Team Lead | Mentoring
+Communication
+Problem Solving
+Project Management
+Stakeholder Management

@@ -1,12 +1,12 @@
 // Keep the per-project copies of the skill list in step with the source of truth.
 //
 // Why copies exist at all, rather than one shared file imported by both sides:
-// the frontend and the backend are deployed as two separate Vercel projects with
-// two separate roots, and a build cannot resolve a path above its own root. A
-// ../shared/ module import works locally and breaks in the deploy - the worst
-// possible ordering for that failure. So the data is duplicated on purpose, and
-// this script makes keeping it identical a one-line command instead of a memory
-// test. Run with --check in CI to fail a build when they drift.
+// Vite refuses to import files from outside frontend/ in dev, and the serverless
+// function only ships what it can trace from backend/. A ../shared/ import works
+// in one place and breaks in another - the worst possible ordering for that
+// failure. So the data is duplicated on purpose, and this script makes keeping
+// it identical automatic: `npm run build` runs it, and `npm test` fails if the
+// copies have drifted.
 //
 // Run: npm run sync:skills
 //      npm run check:skills   (exits non-zero if anything has drifted)

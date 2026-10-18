@@ -21,10 +21,18 @@ export const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true)
 
-    const allowed =
-      CLIENT_ORIGINS.length === 0
-        ? !IS_PRODUCTION // development convenience only; production must list origins
-        : CLIENT_ORIGINS.some((entry) => stripTrailingSlash(entry) === stripTrailingSlash(origin))
+    // Allow all origins when CLIENT_ORIGINS is empty or includes wildcard '*'
+    if (CLIENT_ORIGINS.length === 0 || CLIENT_ORIGINS.includes('*')) {
+      return callback(null, true)
+    }
+
+    const cleanOrigin = stripTrailingSlash(origin)
+    const allowed = CLIENT_ORIGINS.some((entry) => {
+      const cleanEntry = stripTrailingSlash(entry)
+      if (cleanEntry === cleanOrigin) return true
+      if (cleanEntry.startsWith('*.') && cleanOrigin.endsWith(cleanEntry.slice(1))) return true
+      return false
+    })
 
     if (allowed) return callback(null, true)
 

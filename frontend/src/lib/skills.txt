@@ -1,13 +1,133 @@
-# --- Front end ------------------------------------------------------------
-JavaScript
-TypeScript
-React
-Node.js
+# --- Languages ------------------------------------------------------------
+JavaScript | JS | ECMAScript | ES6
+TypeScript | TS
 Python
+Java
+C++ | CPP
+C#  | CSharp
+Golang
+Rust
+PHP
+Ruby
+Kotlin
+Swift
+Scala
 SQL
+HTML | HTML5
+CSS | CSS3
+
+# --- Front end ------------------------------------------------------------
+React | React.js | ReactJS
+Next.js | NextJS
+Vue | Vue.js | VueJS
+Angular | AngularJS
+Svelte
+Redux
+Tailwind CSS | Tailwind
+Sass | SCSS
+Webpack
+Vite
+Responsive Design
+Accessibility | WCAG | a11y
+
+# --- Back end -------------------------------------------------------------
+Node.js | Node | NodeJS
+Express.js | ExpressJS
+NestJS | Nest.js
+Django
+Flask
+FastAPI
+Spring Boot | Spring Framework
+.NET | ASP.NET | dotnet
+Laravel
+Ruby on Rails | Rails
+REST APIs | REST | RESTful | REST API
+GraphQL
+gRPC
+Microservices
+WebSockets | WebSocket
+Authentication | OAuth | JWT | SSO
+
+# --- Data -----------------------------------------------------------------
+MongoDB | Mongo
+PostgreSQL | Postgres
+MySQL
+SQLite
+Redis
+Elasticsearch
+DynamoDB
+Firebase
+Kafka
+RabbitMQ
+Data Modeling | Data Modelling | Schema Design
+ETL
+Pandas
+NumPy
+Spark | Apache Spark
+Tableau
+Power BI
+Excel | Microsoft Excel
+
+# --- Cloud and DevOps -----------------------------------------------------
+AWS | Amazon Web Services
+Azure | Microsoft Azure
+GCP | Google Cloud
 Docker
-AWS
+Kubernetes | K8s
+Terraform
+Ansible
+Linux
+Nginx
+Serverless | Lambda
+Vercel
+Heroku
+CI/CD | CI CD | Continuous Integration | Continuous Delivery | Continuous Deployment
+Jenkins
+GitHub Actions
 Git
-REST APIs
-Testing
-CI/CD
+GitHub
+GitLab
+Monitoring | Observability | Prometheus | Grafana
+
+# --- Quality --------------------------------------------------------------
+Testing | Unit Testing | Integration Testing | TDD
+Jest
+Vitest
+Cypress
+Playwright
+Selenium
+JUnit
+Pytest
+Code Review
+Debugging
+
+# --- AI and ML ------------------------------------------------------------
+Machine Learning | ML
+Deep Learning
+TensorFlow
+PyTorch
+scikit-learn | sklearn
+NLP | Natural Language Processing
+LLM | LLMs | Large Language Models
+Prompt Engineering
+Generative AI | GenAI
+
+# --- Mobile ---------------------------------------------------------------
+React Native
+Flutter
+Android
+iOS
+
+# --- Practices and soft skills -------------------------------------------
+Agile | Scrum | Kanban
+Jira
+Figma
+UI/UX | UX | User Experience
+System Design
+Performance Optimization
+Security | Cybersecurity
+Leadership | Team Lead | Mentoring
+Communication
+Problem Solving
+Project Management
+Stakeholder Management

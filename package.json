@@ -1,19 +1,21 @@
 {
-  "name": "0-to-shipped-resume-parser",
+  "name": "ats-checker",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "0 to shipped resume parser - one deployable: Express serves the API and the built React UI.",
+  "description": "ATS Checker - upload a resume PDF, compare it with a job description, get a score plus present and missing skills. One deployable: Express serves the API and the built React UI.",
   "engines": {
     "node": ">=22.3.0"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "install:all": "npm --prefix frontend install && npm --prefix backend install",
-    "build": "npm --prefix frontend run build",
-    "start": "node backend/server.js",
+    "dev": "node scripts/dev.mjs",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "test": "npm --prefix backend test",
+    "build": "node scripts/sync-skills.mjs && npm --prefix frontend run build",
+    "start": "node backend/server.js",
+    "test": "node scripts/sync-skills.mjs --check && npm --prefix backend test",
     "sync:skills": "node scripts/sync-skills.mjs",
     "check:skills": "node scripts/sync-skills.mjs --check"
   }

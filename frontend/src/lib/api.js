@@ -1,7 +1,7 @@
 // The single place the frontend talks to the backend.
 //
 // The frontend and the API are deployed as ONE Vercel project: the root
-// vercel.json rewrites /api/* to backend/server.js. So the browser calls the API
+// vercel.json rewrites /api/* to api/index.js (which runs backend/server.js). So the browser calls the API
 // on its own origin, no cross-origin request happens, and no CORS applies.
 //
 // VITE_API_URL is therefore an override, not a requirement. Leave it unset for
@@ -9,15 +9,17 @@
 // production and the Vite proxy in development (see vite.config.js). Set it to
 // an absolute URL only if the API genuinely lives somewhere else.
 
-// Empty string means same-origin, which is a valid base - not "no backend".
-const ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')
+// If VITE_API_URL is set (e.g. deployed backend URL), use it.
+// Empty string means same-origin (local Vite proxy or monorepo rewrite).
+const ORIGIN = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 
-// Every call is built from this. For the same-origin case it is "/api", so a
-// request goes to "/api/parse" and never "/api/api/parse".
-const API_ROOT = `${ORIGIN}/api`
+// If ORIGIN already ends with /api, don't duplicate it.
+const API_ROOT = ORIGIN.endsWith('/api')
+  ? ORIGIN
+  : (ORIGIN ? `${ORIGIN}/api` : '/api')
 
 /** Shown in the UI so the active backend is visible at a glance. */
-export const API_BASE = ORIGIN || 'same-origin'
+export const API_BASE = ORIGIN || 'same-origin (proxy)'
 
 // Kept as a named export because App.jsx reads it. It stays true: "/api" is a
 // real path in every deployment of this project, so the UI should always try the
@@ -25,7 +27,7 @@ export const API_BASE = ORIGIN || 'same-origin'
 // offline scoring, which App.jsx already handles.
 export const hasApi = true
 
-const OFFLINE_HINT = 'The backend was not reachable, so these numbers are the offline estimate.'
+const OFFLINE_HINT = 'The backend could not be reached.'
 
 /**
  * Send a resume + JD and get a score back. The timeout at the call site has to
@@ -34,7 +36,11 @@ const OFFLINE_HINT = 'The backend was not reachable, so these numbers are the of
  * shorter client timeout would throw away an answer that was about to arrive.
  *
  * @param {{ file: File, jobDescription: string, signal?: AbortSignal, timeoutMs?: number }} args
- * @returns {Promise<{ ok: true, data: object } | { ok: false, error: string }>}
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: string, unreachable: boolean }>}
+ *   `unreachable` is true only when no real answer came back from OUR backend
+ *   (network failure, gateway error, or an HTML page where JSON should be). A
+ *   backend that answered with a 4xx - "that is not a PDF", "no readable text" -
+ *   is reachable, and its message must be shown rather than papered over.
  */
 export async function parseResume({ file, jobDescription, signal, timeoutMs = 60000 }) {
   const form = new FormData()
@@ -62,16 +68,30 @@ export async function parseResume({ file, jobDescription, signal, timeoutMs = 60
     const payload = await res.json().catch(() => null)
 
     if (!res.ok) {
-      return { ok: false, error: payload?.error || `Request failed (${res.status}).` }
+      // No JSON body, or a gateway status, means the request never reached our
+      // Express app (cold-start crash, 502/504, a static host with no /api).
+      const gateway = !payload || [502, 503, 504].includes(res.status)
+      return {
+        ok: false,
+        unreachable: gateway,
+        error: payload?.error || `Request failed (${res.status}).`,
+      }
     }
     if (!payload || typeof payload.score !== 'number') {
-      return { ok: false, error: 'The server replied in a shape the UI cannot read.' }
+      // Typically index.html returned for /api/parse by a server with no backend.
+      return {
+        ok: false,
+        unreachable: true,
+        error: 'The server replied in a shape the UI cannot read.',
+      }
     }
     return { ok: true, data: payload }
   } catch (err) {
-    if (signal?.aborted) return { ok: false, error: 'Cancelled.' }
-    if (err?.name === 'AbortError') return { ok: false, error: 'The server took too long to answer.' }
-    return { ok: false, error: OFFLINE_HINT }
+    if (signal?.aborted) return { ok: false, unreachable: false, error: 'Cancelled.' }
+    if (err?.name === 'AbortError') {
+      return { ok: false, unreachable: false, error: 'The server took too long to answer. Please try again.' }
+    }
+    return { ok: false, unreachable: true, error: OFFLINE_HINT }
   } finally {
     clearTimeout(timeout)
     signal?.removeEventListener('abort', onAbort)

@@ -3,7 +3,10 @@
 import multer from 'multer'
 import { httpError, isPdf } from '../utils.js'
 
-export const MAX_FILE_MB = 5
+// 4, not 5: Vercel rejects any request body over ~4.5 MB at the platform edge,
+// before Express runs, with a non-JSON error. Staying under that keeps the
+// "too large" message ours and consistent between localhost and production.
+export const MAX_FILE_MB = 4
 
 // memoryStorage keeps the PDF in RAM as req.file.buffer for the length of the
 // request. That is the right choice on Vercel, where the filesystem is read-only

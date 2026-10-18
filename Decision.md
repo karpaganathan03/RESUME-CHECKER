@@ -9,3 +9,5 @@ Delete unnecessary folder
 keep the project order professionaly like backend-->Database-->server-->Frontend 
 I didn't deploy the frontend seperately rather i had build both simulataneously according to my conditions make the possible changes in the project keep in mind i'm not going to deploy frontend and backend seperately i m going to deploy as a MERN stack project make alternatives regarding to that.
 lets connect the labd AI and parse the resume and give the score for this i'm gonna use the  labd APIkey while deployment
+
+12: Separate frontend and backend for independent deployment: added frontend/vercel.json and backend/vercel.json, created backend/api/index.js entry point, updated CORS to allow separate frontend origins, created root index.html to prevent local static directory listing, and fixed MongoDB credentials in backend/.env.

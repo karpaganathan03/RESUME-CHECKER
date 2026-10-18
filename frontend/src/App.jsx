@@ -2,8 +2,9 @@ import { useRef, useState } from 'react'
 import { parseResume as callApi, hasApi, API_BASE } from './lib/api.js'
 import { scoreLocally } from './lib/scoring.js'
 
-// Shared by the controller and the UI so a mismatch cannot drift.
-const MAX_FILE_MB = 5
+// Must match MAX_FILE_MB in backend/middleware/upload.middleware.js. It is 4, not
+// 5, because Vercel rejects request bodies over ~4.5 MB before Express sees them.
+const MAX_FILE_MB = 4
 
 export default function App() {
   const [file, setFile] = useState(null)
@@ -78,8 +79,17 @@ export default function App() {
           return
         }
 
-        // A reached-but-failed backend is worth surfacing; fall back meanwhile.
-        setNotice(`${response.error} Showing the offline estimate.`)
+        if (response.error === 'Cancelled.') return
+
+        // The backend answered and said no ("not a PDF", "no readable text"). That
+        // is a real answer: show it. Inventing a score here would hide the cause.
+        if (!response.unreachable) {
+          setError(response.error)
+          return
+        }
+
+        // Only a backend that cannot be reached at all falls back to the demo.
+        setNotice(`${response.error} Showing a demo estimate instead.`)
       }
 
       const local = scoreLocally(file, jobDescription)
@@ -104,9 +114,9 @@ export default function App() {
   return (
     <div className="page">
       <header className="hero">
-        <span className="badge">0 to shipped</span>
-        <h1>Resume Parser</h1>
-        <p>Upload a PDF resume and paste the job description. You get a match score, the skills you have, and the ones you are missing.</p>
+        <span className="badge">Applicant Tracking System</span>
+        <h1>ATS Checker</h1>
+        <p>Upload your PDF resume and paste the job description. You get an ATS match score, the skills your resume has, and the ones it is missing.</p>
       </header>
 
       <main className="card">
@@ -184,6 +194,14 @@ export default function App() {
               </ul>
             </div>
 
+            {result.source === 'offline' && (
+              <p className="notice">
+                Demo estimate: the backend could not be reached, so this score is a placeholder
+                and is <strong>not</strong> based on what your resume says. Start the server and
+                try again for a real result.
+              </p>
+            )}
+
             {result.aiSummary && (
               <div className="verdict">
                 <h3>AI verdict</h3>
@@ -200,10 +218,18 @@ export default function App() {
       </main>
 
       <footer className="foot">
-        {result && result.engine === 'ai' ? 'Scored by labd AI, reviewed against the built-in rules.' : 'Scored by the built-in rules. Add LABD_API_KEY to enable the AI verdict.'}
+        {footerText(result)}
       </footer>
     </div>
   )
+}
+
+function footerText(result) {
+  if (!result) return 'Your resume is read on the server and the PDF itself is never stored.'
+  if (result.source === 'offline') return 'Demo estimate only. Nothing was read from your PDF.'
+  const saved = result.persisted ? ' Result saved.' : ''
+  if (result.engine === 'ai') return `Scored by labd AI, checked against the built-in ATS rules.${saved}`
+  return `Scored by the built-in ATS rules. Set LABD_API_KEY on the server to add the AI verdict.${saved}`
 }
 
 function ScoreDial({ score }) {

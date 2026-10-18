@@ -22,18 +22,56 @@ export function normalizeText(text) {
 }
 
 /**
- * Which of `skills` appear as whole words in `text`.
- *
- * The word boundary matters: without it "Git" matches "digital", "Java" matches
- * "JavaScript", and "SQL" matches "MySQL" - the classic false positives in naive
- * keyword scoring.
+ * Split a vocabulary line - "Postgres | PostgreSQL | pg" style - into its
+ * canonical name (the first entry) and every spelling that counts as a match.
  */
-export function findSkills(text, skills) {
+export function parseSkillEntry(entry) {
+  const names = String(entry)
+    .split('|')
+    .map((n) => n.trim())
+    .filter(Boolean)
+  return { name: names[0] || '', spellings: names }
+}
+
+/** The name the report shows for a vocabulary line. */
+export function canonicalSkill(entry) {
+  return parseSkillEntry(entry).name
+}
+
+/**
+ * Does `haystack` (already lower-cased) contain `spelling` as a whole term?
+ *
+ * \b is the obvious tool and the wrong one: it only exists between a word
+ * character and a non-word character, so it can never match around the "+" in
+ * "C++", the "#" in "C#", or the leading "." in ".NET". Lookarounds say what is
+ * actually meant - "not glued to another letter or digit on either side", and
+ * not the tail of a dotted name (so the alias "JS" does not fire inside
+ * "Node.js") - and still reject "Git" in "digital", "Java" in "JavaScript" and "SQL" in "MySQL".
+ */
+function containsTerm(haystack, spelling) {
+  const term = escapeRegex(spelling.toLowerCase())
+  return new RegExp(`(?<![a-z0-9_])(?<![a-z0-9_]\\.)${term}(?![a-z0-9_])`).test(haystack)
+}
+
+/**
+ * The vocabulary lines (aliases intact) that `text` mentions. Callers that go on
+ * to match again - the resume against the job description's skills - need the
+ * full lines back, not just the display names.
+ */
+export function matchingEntries(text, skills) {
   const haystack = String(text || '').toLowerCase()
   if (!haystack) return []
-  return skills.filter((skill) =>
-    new RegExp(`\\b${escapeRegex(skill.toLowerCase())}\\b`).test(haystack),
+  return skills.filter((entry) =>
+    parseSkillEntry(entry).spellings.some((s) => containsTerm(haystack, s)),
   )
+}
+
+/**
+ * Which of `skills` appear in `text`, returned by canonical name.
+ * Each entry may carry aliases ("JavaScript | JS"); any one of them counts.
+ */
+export function findSkills(text, skills) {
+  return matchingEntries(text, skills).map(canonicalSkill)
 }
 
 /** Is this upload plausibly a PDF? */

@@ -1,9 +1,13 @@
-// Offline scoring for the "0 to shipped" resume parser.
+// Offline DEMO scoring for the ATS Checker.
 //
 // The backend is the real path. This module is the fallback the UI uses when no
 // VITE_API_URL is set, or when the API cannot be reached, so the app still works
 // with no server, no database and no API key - which covers the "mock design"
 // stage of the brief and makes a fresh clone runnable.
+//
+// IMPORTANT: this does NOT read the PDF. It only fingerprints the file name and
+// size, so its numbers are a placeholder for the demo, never a real ATS result.
+// The UI labels it that way. Real scoring happens on the backend.
 //
 // Scoring is deterministic: the same resume and the same job description always
 // produce the same numbers, fingerprinted from the file name/size and the JD.
@@ -16,15 +20,26 @@
 
 import skillsRaw from './skills.txt?raw'
 
-/** Blank lines and lines starting with # are comments, not skills. */
+/**
+ * Blank lines and lines starting with # are comments. A line is
+ * "Canonical | alias | alias": the first name is shown, any spelling matches.
+ */
 function parseSkills(raw) {
   return String(raw)
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith('#'))
+    .map((line) => {
+      const spellings = line.split('|').map((n) => n.trim()).filter(Boolean)
+      return { name: spellings[0], spellings }
+    })
 }
 
-export const ALL_SKILLS = parseSkills(skillsRaw)
+const VOCABULARY = parseSkills(skillsRaw)
+const CORE = ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'SQL', 'Docker', 'AWS', 'Git', 'REST APIs', 'Testing', 'CI/CD']
+const CORE_ENTRIES = VOCABULARY.filter((entry) => CORE.includes(entry.name))
+
+export const ALL_SKILLS = VOCABULARY.map((entry) => entry.name)
 
 // Used when the caller has no job description to compare against.
 const FALLBACK_ROLE = 'Frontend Engineer'
@@ -42,9 +57,13 @@ function escapeRegex(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-// Word boundaries, or "Git" matches "digital" and "SQL" matches "MySQL".
-function mentions(text, skill) {
-  return new RegExp(`\\b${escapeRegex(skill.toLowerCase())}\\b`).test(String(text).toLowerCase())
+// Lookarounds rather than \b, so "C++" and ".NET" match, while "Git" still does
+// not match "digital" and "SQL" does not match "MySQL".
+function mentions(text, entry) {
+  const haystack = String(text).toLowerCase()
+  return entry.spellings.some((spelling) =>
+    new RegExp(`(?<![a-z0-9_])(?<![a-z0-9_]\\.)${escapeRegex(spelling.toLowerCase())}(?![a-z0-9_])`).test(haystack),
+  )
 }
 
 // First short, non-sentence line - usually the job title at the top of a JD.
@@ -65,10 +84,10 @@ function guessRole(jobDescription) {
 export function scoreLocally(file, jobDescription) {
   const seed = seedFrom(file.name, String(file.size), jobDescription)
 
-  const demanded = ALL_SKILLS.filter((skill) => mentions(jobDescription || '', skill))
-  // With no JD (or too short a one), everything counts and the resume is scored
-  // on its own. The < 3 guard avoids a 0-or-100 score against a single skill.
-  const targets = demanded.length >= 3 ? demanded : ALL_SKILLS
+  const demanded = VOCABULARY.filter((entry) => mentions(jobDescription || '', entry))
+  // With no JD (or too short a one) the short core set is the target. The < 3
+  // guard avoids a 0-or-100 score against a single skill.
+  const targets = (demanded.length >= 3 ? demanded : CORE_ENTRIES).map((entry) => entry.name)
 
   // Deterministic subset, so a resume always has both hits and gaps to show.
   const present = targets.filter((_, i) => (seed >> i % 12) % 4 !== 0)
@@ -92,5 +111,7 @@ export function scoreLocally(file, jobDescription) {
       { label: 'One page or less', pass: file.size < 300_000 },
     ],
     source: 'offline',
+    aiSummary: null,
+    engine: 'offline',
   }
 }

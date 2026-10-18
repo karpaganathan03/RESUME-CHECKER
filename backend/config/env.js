@@ -65,8 +65,9 @@ export function describeAi() {
 
 /** Printed on boot, so the CORS posture is never a guess. */
 export function describeCors() {
+  if (CLIENT_ORIGINS.includes('*')) return 'CORS: allowing all origins (*)'
   if (CLIENT_ORIGINS.length > 0) return `CORS allowing: ${CLIENT_ORIGINS.join(', ')}`
-  return 'CORS: same-origin only (the UI is served by this same app)'
+  return 'CORS: allowing all origins (configure CLIENT_ORIGINS in .env to restrict)'
 }
 
 /**

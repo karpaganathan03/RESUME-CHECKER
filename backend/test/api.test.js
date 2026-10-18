@@ -11,6 +11,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import app from '../server.js'
 import { extractPdfText } from '../services/pdf.service.js'
+import { closeDB } from '../database/connection.js'
 
 let server
 let base
@@ -24,7 +25,8 @@ before(async () => {
 })
 
 after(async () => {
-  await new Promise((resolve) => server.close(resolve))
+  await closeDB()
+  if (server) await new Promise((resolve) => server.close(resolve))
 })
 
 test('the pdf-parse module exposes a callable export', () => {

@@ -9,8 +9,8 @@
 // Everything here is pure: text in, result out, no network, no database. That
 // makes it the cheap part to unit test.
 
-import { findSkills } from '../utils.js'
-import { loadSkillVocabulary } from '../config/skills.js'
+import { findSkills, matchingEntries, canonicalSkill } from '../utils.js'
+import { loadSkillVocabulary, loadCoreSkills } from '../config/skills.js'
 
 export const DEFAULT_ROLE = 'Software Engineer'
 
@@ -53,11 +53,12 @@ export function guessRole(jobDescription) {
  * the same comparison the rules made, or the two answers are not comparable.
  */
 export function targetSkills(jobDescription) {
-  const vocabulary = loadSkillVocabulary()
-  const demanded = findSkills(String(jobDescription || ''), vocabulary)
+  const demanded = matchingEntries(String(jobDescription || ''), loadSkillVocabulary())
   // The "< 3" guard stops a one-line JD ("we use React") from producing a
-  // meaningless 0-or-100 score against a single skill.
-  return demanded.length >= 3 ? demanded : vocabulary
+  // meaningless 0-or-100 score against a single skill. The fallback is the short
+  // core set, not the whole vocabulary, so a resume is not graded against
+  // skills from every other profession.
+  return demanded.length >= 3 ? demanded : loadCoreSkills()
 }
 
 /**
@@ -96,7 +97,8 @@ export function scoreResume(resumeText, jobDescription) {
 
   const targets = targetSkills(jd)
   const present = findSkills(resumeText, targets)
-  const missing = targets.filter((skill) => !present.includes(skill))
+  const targetNames = targets.map(canonicalSkill)
+  const missing = targetNames.filter((skill) => !present.includes(skill))
 
   const skillMatch = targets.length ? present.length / targets.length : 0
   const hasContact = EMAIL.test(resumeText) || PHONE.test(resumeText)

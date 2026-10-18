@@ -1,4 +1,4 @@
-// 0 to shipped - Resume Parser (single deployable)
+// ATS Checker (single deployable)
 //
 // This one file is BOTH the API and the web server for the built UI. That is the
 // single-project deployment: the frontend and the backend are not two Vercel
@@ -20,7 +20,7 @@ import routes from './routes/index.js'
 import { corsMiddleware } from './middleware/cors.middleware.js'
 import { handleUploadErrors } from './middleware/upload.middleware.js'
 import { errorHandler, notFound } from './middleware/error.middleware.js'
-import { PORT, assertProductionConfig, describeCors, describeAi } from './config/env.js'
+import { PORT, IS_PRODUCTION, assertProductionConfig, describeCors, describeAi } from './config/env.js'
 import { connectDB } from './database/connection.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -46,6 +46,11 @@ export function createApp() {
           ...helmet.contentSecurityPolicy.getDefaultDirectives(),
           'img-src': ["'self'", 'data:'],
           'connect-src': ["'self'"],
+          // Helmet's default upgrades every http:// subresource to https://. On
+          // http://localhost that makes Safari refuse to load the page's own JS
+          // and CSS. Only production is served over https, so only production
+          // gets the upgrade.
+          'upgrade-insecure-requests': IS_PRODUCTION ? [] : null,
         },
       },
     }),
@@ -77,6 +82,34 @@ export function createApp() {
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET' || req.path.startsWith('/api')) return next()
       res.sendFile(join(DIST_DIR, 'index.html'))
+    })
+  }
+
+  // No build yet: say so, instead of a bare 404 that looks like a broken app.
+  // This is the page people land on after `npm start` without `npm run build`.
+  if (!existsSync(DIST_DIR)) {
+    app.get('/', (req, res) => {
+      if (req.accepts('json') && !req.accepts('html')) {
+        return res.status(200).json({
+          status: 'ok',
+          message: 'ATS Checker API is running in standalone mode',
+          health: '/api/health',
+          parse: '/api/parse',
+        })
+      }
+      res
+        .status(200)
+        .type('html')
+        .send(
+          '<!doctype html><meta charset="utf-8"><title>ATS Checker API</title>' +
+            '<body style="font:16px/1.5 system-ui;max-width:42rem;margin:4rem auto;padding:0 1rem">' +
+            '<h1>ATS Checker API is running</h1>' +
+            '<p>Backend is operating in standalone API mode.</p>' +
+            '<ul><li>For development UI, run <code>npm run dev</code> and open ' +
+            '<a href="http://localhost:5173">http://localhost:5173</a>.</li>' +
+            '<li>API health check: <a href="/api/health">/api/health</a></li>' +
+            '<li>Upload endpoint: <code>POST /api/parse</code></li></ul></body>',
+        )
     })
   }
 
@@ -121,14 +154,14 @@ if (isDirectRun()) {
     process.exit(1)
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`)
     console.log(describeCors())
     console.log(describeAi())
 
     if (!existsSync(DIST_DIR)) {
       console.log(
-        'No frontend/dist yet - serving the API only. Run `npm run build` at the root to serve the UI from this same server.',
+        'Backend running in standalone API mode (frontend/dist not present - UI served independently).',
       )
     }
 
@@ -138,5 +171,16 @@ if (isDirectRun()) {
     connectDB()
       .then(() => console.log('MongoDB connected'))
       .catch((err) => console.warn(`MongoDB not connected: ${err.message}`))
+  })
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n[startup error] Port ${PORT} is already in use by another running process.`)
+      console.error(`To release port ${PORT} in PowerShell, run:`)
+      console.error(`  Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force\n`)
+    } else {
+      console.error(`\n[startup error] Server failed to start:`, err.message)
+    }
+    process.exit(1)
   })
 }

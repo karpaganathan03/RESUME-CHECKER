@@ -1,10 +1,12 @@
 // Loads the skill vocabulary for the backend.
 //
-// It reads backend/skills.txt - a file INSIDE this project's root - and not
-// shared/skills.txt. That detail matters: on Vercel the backend is deployed from
-// backend/ alone, so a file above that folder is not shipped, and a read that
-// reaches outside the root fails at runtime while working perfectly on
-// localhost. That class of bug is worth designing out rather than discovering.
+// It reads backend/skills.txt - a file inside backend/ - and not
+// shared/skills.txt. The serverless function ships what it can trace from
+// backend/ (vercel.json lists skills.txt under includeFiles), so a read that
+// reaches above that folder would work on localhost and fail after deploy.
+//
+// Lines look like "Postgres | PostgreSQL | pg": the first name is canonical, the
+// rest are aliases. See shared/skills.txt.
 //
 // shared/skills.txt is the copy a human edits, and `npm run sync:skills` copies
 // it here. One source of truth, one mechanical copy step, and nothing at build
@@ -37,6 +39,15 @@ const FALLBACK = [
   'CI/CD',
 ]
 
+// What a resume is judged against when the job description names too few skills
+// to be a fair target. Scoring a resume against the ENTIRE vocabulary (130+
+// skills across every field) would cap every score near zero, so this short
+// general-purpose set stands in instead.
+export const CORE_SKILLS = [
+  'JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'SQL',
+  'Docker', 'AWS', 'Git', 'REST APIs', 'Testing', 'CI/CD',
+]
+
 let cached = null
 
 /** Blank lines and lines starting with # are comments, not skills. */
@@ -45,6 +56,15 @@ export function parseSkillLines(raw) {
     .split(/\r?\n/) // handles CRLF and LF alike
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith('#'))
+}
+
+/** The core subset, as full vocabulary lines (aliases included). */
+export function loadCoreSkills() {
+  const wanted = new Set(CORE_SKILLS.map((n) => n.toLowerCase()))
+  const core = loadSkillVocabulary().filter((line) =>
+    wanted.has(line.split('|')[0].trim().toLowerCase()),
+  )
+  return core.length > 0 ? core : loadSkillVocabulary()
 }
 
 /** @returns {string[]} the skill vocabulary, cached for the life of the process */

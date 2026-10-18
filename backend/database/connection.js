@@ -48,3 +48,11 @@ export async function connectDB() {
 export function isDbConnected() {
   return mongoose.connection.readyState === 1;
 }
+
+export async function closeDB() {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+    cache.conn = null;
+    cache.promise = null;
+  }
+}
