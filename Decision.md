@@ -11,3 +11,6 @@ I didn't deploy the frontend seperately rather i had build both simulataneously 
 lets connect the labd AI and parse the resume and give the score for this i'm gonna use the  labd APIkey while deployment
 
 12: Separate frontend and backend for independent deployment: added frontend/vercel.json and backend/vercel.json, created backend/api/index.js entry point, updated CORS to allow separate frontend origins, created root index.html to prevent local static directory listing, and fixed MongoDB credentials in backend/.env.
+13: Configured repository for Vercel Services multi-service deployment: added services configuration for backend (Express) and frontend (Vite) with top-level rewrites (/api/(.*) -> backend, /(.*) -> frontend), added GET /api route, and bundled skills.txt.
+13: Configured repository for Vercel Services multi-service deployment: added services configuration for backend (Express) and frontend (Vite) with top-level rewrites (/api/(.*) -> backend, /(.*) -> frontend), added GET /api route, and bundled skills.txt.
+12: Separate frontend and backend for independent deployment: added frontend/vercel.json and backend/vercel.json, created backend/api/index.js entry point, updated CORS to allow separate frontend origins, created root index.html to prevent local static directory listing, and fixed MongoDB credentials in backend/.env.

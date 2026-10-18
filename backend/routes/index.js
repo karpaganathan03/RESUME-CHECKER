@@ -10,6 +10,19 @@ import { upload } from '../middleware/upload.middleware.js'
 
 const router = Router()
 
+/** API root info */
+router.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'ATS Checker API',
+    endpoints: {
+      health: '/api/health',
+      parse: 'POST /api/parse',
+      scores: 'GET /api/scores',
+    },
+  })
+})
+
 /** Liveness check. Deliberately cheap: no database, no PDF library. */
 router.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) })
